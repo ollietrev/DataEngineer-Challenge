@@ -1,1 +1,1132 @@
+# Eli Lilly Data Engineer Task
+
+1. Create a query that calculates the average number of goals per game between 1900 and 2000.
+2. Create a query that counts the number of shootouts wins by country and arrange in alphabetical order.
+3. Create a reliable key that allows the joining together of goal scorers, results, and shootouts.
+4. Create a query that identifies which teams have won a penalty shootout after a 1-1 draw.
+5. Create a query that identifies the top goal scorer by tournament, and what percentage that equates to for all goals scored in the tournament.
+
+6. Create an additional column that flags records with data quality issues.
+7. Resolve the identified quality issues.
+
+Start by importing the csv files using Pandas.
+
+
+```python
+import pandas as pd
+import numpy as np
+
+goalscorers_df = pd.read_csv('goalscorers.csv')
+results_df = pd.read_csv('results.csv')
+shootouts_df = pd.read_csv('shootouts.csv')
+```
+
+## Task 1
+
+The results.csv file contains data on number of goals per game in each year.
+
+
+```python
+results_df.head(5)
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>date</th>
+      <th>home_team</th>
+      <th>away_team</th>
+      <th>home_score</th>
+      <th>away_score</th>
+      <th>tournament</th>
+      <th>city</th>
+      <th>country</th>
+      <th>neutral</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>1872-11-30</td>
+      <td>Scotland</td>
+      <td>England</td>
+      <td>0</td>
+      <td>0</td>
+      <td>Friendly</td>
+      <td>Glasgow</td>
+      <td>Scotland</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>1873-03-08</td>
+      <td>England</td>
+      <td>Scotland</td>
+      <td>4</td>
+      <td>2</td>
+      <td>Friendly</td>
+      <td>London</td>
+      <td>England</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>1874-03-07</td>
+      <td>Scotland</td>
+      <td>England</td>
+      <td>2</td>
+      <td>1</td>
+      <td>Friendly</td>
+      <td>Glasgow</td>
+      <td>Scotland</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>1875-03-06</td>
+      <td>England</td>
+      <td>Scotland</td>
+      <td>2</td>
+      <td>2</td>
+      <td>Friendly</td>
+      <td>London</td>
+      <td>England</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>1876-03-04</td>
+      <td>Scotland</td>
+      <td>England</td>
+      <td>3</td>
+      <td>0</td>
+      <td>Friendly</td>
+      <td>Glasgow</td>
+      <td>Scotland</td>
+      <td>False</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+
+```python
+results_df.dtypes
+```
+
+
+
+
+    date          object
+    home_team     object
+    away_team     object
+    home_score     int64
+    away_score     int64
+    tournament    object
+    city          object
+    country       object
+    neutral         bool
+    dtype: object
+
+
+
+We see how data is an object, would be best to convert to datetime format so we can extract the year.
+
+
+```python
+results_df['date'] = pd.to_datetime(results_df['date'])
+```
+
+We now filter the results where the game was played between 1900 and 2000.
+
+
+```python
+filtered_results = results_df[(results_df['date'].dt.year >= 1900) & (results_df['date'].dt.year < 2000)]
+```
+
+We sum all the home goals and away goals to find the total goals scored per game.
+
+
+```python
+total_goals = filtered_results['home_score'].sum() + filtered_results['away_score'].sum()
+```
+
+We now find how many games were played between these years, in order to find the average number of goals per game.
+
+
+```python
+number_games = len(filtered_results)
+
+average_goals = total_goals / number_games
+
+average_goals
+```
+
+
+
+
+    3.0824074074074073
+
+
+
+## Task 2
+
+The shootouts_df DataFrame contains the results of all the penalty shootouts.
+
+
+```python
+shootouts_df.head(5)
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>date</th>
+      <th>home_team</th>
+      <th>away_team</th>
+      <th>winner</th>
+      <th>first_shooter</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>1967-08-22</td>
+      <td>India</td>
+      <td>Taiwan</td>
+      <td>Taiwan</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>1971-11-14</td>
+      <td>South Korea</td>
+      <td>Vietnam Republic</td>
+      <td>South Korea</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>1972-05-07</td>
+      <td>South Korea</td>
+      <td>Iraq</td>
+      <td>Iraq</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>1972-05-17</td>
+      <td>Thailand</td>
+      <td>South Korea</td>
+      <td>South Korea</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>1972-05-19</td>
+      <td>Thailand</td>
+      <td>Cambodia</td>
+      <td>Thailand</td>
+      <td>NaN</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+We can group by each winning team and find the number of times this team appears as a winner using .size(). .sort_index() sorts  by alphabetical order. We then turn this into a pandas DataFrame and rename the column to count.
+
+
+```python
+penalty_winner = pd.DataFrame(shootouts_df.groupby('winner').size().sort_index())
+penalty_winner = penalty_winner.rename(columns={0: 'count'})
+
+penalty_winner
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>count</th>
+    </tr>
+    <tr>
+      <th>winner</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Abkhazia</th>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>Algeria</th>
+      <td>7</td>
+    </tr>
+    <tr>
+      <th>Angola</th>
+      <td>7</td>
+    </tr>
+    <tr>
+      <th>Antigua and Barbuda</th>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>Argentina</th>
+      <td>14</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>Zambia</th>
+      <td>13</td>
+    </tr>
+    <tr>
+      <th>Zanzibar</th>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>Zimbabwe</th>
+      <td>7</td>
+    </tr>
+    <tr>
+      <th>Åland</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>Åland Islands</th>
+      <td>2</td>
+    </tr>
+  </tbody>
+</table>
+<p>163 rows × 1 columns</p>
+</div>
+
+
+
+## Task 3
+
+We start by identifying common columns in each dataset.
+
+
+```python
+shootouts_df.columns, results_df.columns, goalscorers_df.columns
+```
+
+
+
+
+    (Index(['date', 'home_team', 'away_team', 'winner', 'first_shooter'], dtype='object'),
+     Index(['date', 'home_team', 'away_team', 'home_score', 'away_score',
+            'tournament', 'city', 'country', 'neutral'],
+           dtype='object'),
+     Index(['date', 'home_team', 'away_team', 'team', 'scorer', 'minute',
+            'own_goal', 'penalty'],
+           dtype='object'))
+
+
+
+'date', 'home_team', and 'away_team' are common to all datasets, allowing us to map each game uniquely. We can create composite keys with these columns.
+
+
+```python
+shootouts_df['match_key'] = (
+    shootouts_df['date'].astype(str) + "_" + shootouts_df['home_team'] + "_" + shootouts_df['away_team']
+)
+results_df['match_key'] = (
+    results_df['date'].astype(str) + "_" + results_df['home_team'] + "_" + results_df['away_team']
+)
+goalscorers_df['match_key'] = (
+    goalscorers_df['date'].astype(str) + "_" + goalscorers_df['home_team'] + "_" + goalscorers_df['away_team']
+)
+```
+
+## Task 4
+
+We want to merge the shootouts dataset with the results dataset and find all the games where the #away goals = #home goals = 1. We use an inner join rather than a left join because there appears to be data for a shootout that doesnt appear in the results table.
+
+
+```python
+merged_data = shootouts_df.merge(results_df, on='match_key', how='inner')
+
+merged_data_left = shootouts_df.merge(results_df, on='match_key', how='left')
+
+difference = merged_data_left[~merged_data_left['match_key'].isin(merged_data['match_key'])]
+
+difference #Saare County vs Aland Islands 2011 match is not present in results.csv
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>date_x</th>
+      <th>home_team_x</th>
+      <th>away_team_x</th>
+      <th>winner</th>
+      <th>first_shooter</th>
+      <th>match_key</th>
+      <th>date_y</th>
+      <th>home_team_y</th>
+      <th>away_team_y</th>
+      <th>home_score</th>
+      <th>away_score</th>
+      <th>tournament</th>
+      <th>city</th>
+      <th>country</th>
+      <th>neutral</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>378</th>
+      <td>2011-06-29</td>
+      <td>Saare County</td>
+      <td>Åland Islands</td>
+      <td>Åland Islands</td>
+      <td>NaN</td>
+      <td>2011-06-29_Saare County_Åland Islands</td>
+      <td>NaT</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+Filter by games where the home team scored just once, and the away team scored just once.
+
+
+```python
+filtered_results = merged_data[(merged_data['home_score'] == 1) & (merged_data['away_score'] == 1)]
+filtered_results.head()
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>date_x</th>
+      <th>home_team_x</th>
+      <th>away_team_x</th>
+      <th>winner</th>
+      <th>first_shooter</th>
+      <th>match_key</th>
+      <th>date_y</th>
+      <th>home_team_y</th>
+      <th>away_team_y</th>
+      <th>home_score</th>
+      <th>away_score</th>
+      <th>tournament</th>
+      <th>city</th>
+      <th>country</th>
+      <th>neutral</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>1967-08-22</td>
+      <td>India</td>
+      <td>Taiwan</td>
+      <td>Taiwan</td>
+      <td>NaN</td>
+      <td>1967-08-22_India_Taiwan</td>
+      <td>1967-08-22</td>
+      <td>India</td>
+      <td>Taiwan</td>
+      <td>1</td>
+      <td>1</td>
+      <td>Merdeka Tournament</td>
+      <td>Kuala Lumpur</td>
+      <td>Malaysia</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>1971-11-14</td>
+      <td>South Korea</td>
+      <td>Vietnam Republic</td>
+      <td>South Korea</td>
+      <td>NaN</td>
+      <td>1971-11-14_South Korea_Vietnam Republic</td>
+      <td>1971-11-14</td>
+      <td>South Korea</td>
+      <td>Vietnam Republic</td>
+      <td>1</td>
+      <td>1</td>
+      <td>King's Cup</td>
+      <td>Bangkok</td>
+      <td>Thailand</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>1972-05-17</td>
+      <td>Thailand</td>
+      <td>South Korea</td>
+      <td>South Korea</td>
+      <td>NaN</td>
+      <td>1972-05-17_Thailand_South Korea</td>
+      <td>1972-05-17</td>
+      <td>Thailand</td>
+      <td>South Korea</td>
+      <td>1</td>
+      <td>1</td>
+      <td>AFC Asian Cup</td>
+      <td>Bangkok</td>
+      <td>Thailand</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>1973-06-14</td>
+      <td>Guinea</td>
+      <td>Mali</td>
+      <td>Guinea</td>
+      <td>NaN</td>
+      <td>1973-06-14_Guinea_Mali</td>
+      <td>1973-06-14</td>
+      <td>Guinea</td>
+      <td>Mali</td>
+      <td>1</td>
+      <td>1</td>
+      <td>African Cup of Nations qualification</td>
+      <td>Conakry</td>
+      <td>Guinea</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>1973-06-14</td>
+      <td>Mauritius</td>
+      <td>Tanzania</td>
+      <td>Mauritius</td>
+      <td>NaN</td>
+      <td>1973-06-14_Mauritius_Tanzania</td>
+      <td>1973-06-14</td>
+      <td>Mauritius</td>
+      <td>Tanzania</td>
+      <td>1</td>
+      <td>1</td>
+      <td>African Cup of Nations qualification</td>
+      <td>Port Louis</td>
+      <td>Mauritius</td>
+      <td>False</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+Look at just the winner column and count how many times this team appears.
+
+
+```python
+filtered_results['winner'].value_counts()
+```
+
+
+
+
+    South Korea            7
+    Uruguay                7
+    Burkina Faso           6
+    Argentina              6
+    Mali                   5
+                          ..
+    Antigua and Barbuda    1
+    Zambia                 1
+    Cuba                   1
+    Sudan                  1
+    Åland                  1
+    Name: winner, Length: 115, dtype: int64
+
+
+
+## Task 5
+
+We start by merging the goalscorers data and the results data on the match key and by a left join. We then group by the tournament and scorer and calculate the size using .size().
+
+
+```python
+merged_data = goalscorers_df.merge(results_df, on='match_key', how='left')
+tournament_goalscorers = merged_data.groupby(['tournament', 'scorer']).size().reset_index(name='goals')
+```
+
+The merged_data is used to work out the total number of goals per tournament. We did a left join with the goalscorers dataset, so every row corresponds to a goal.
+
+
+```python
+total_goals_tournament = merged_data.groupby('tournament').size().reset_index(name='total_goals')
+```
+
+We then merge these two datasets on the 'tournament' column to collect information on total goals and goals per player. The percentage is calculated and the top scorer is identified.
+
+
+```python
+tournament_goals = tournament_goalscorers.merge(total_goals_tournament, on='tournament')
+
+tournament_goals['goal_percentage'] = (tournament_goals['goals'] / tournament_goals['total_goals']) * 100
+
+top_scorers = tournament_goals.loc[tournament_goals.groupby('tournament')['goals'].idxmax()]
+```
+
+
+```python
+top_scorers
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>tournament</th>
+      <th>scorer</th>
+      <th>goals</th>
+      <th>total_goals</th>
+      <th>goal_percentage</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>33</th>
+      <td>AFC Asian Cup</td>
+      <td>Ali Daei</td>
+      <td>14</td>
+      <td>989</td>
+      <td>1.415571</td>
+    </tr>
+    <tr>
+      <th>1314</th>
+      <td>African Cup of Nations</td>
+      <td>Samuel Eto'o</td>
+      <td>18</td>
+      <td>1767</td>
+      <td>1.018676</td>
+    </tr>
+    <tr>
+      <th>1601</th>
+      <td>Baltic Cup</td>
+      <td>Ēriks Pētersons</td>
+      <td>9</td>
+      <td>229</td>
+      <td>3.930131</td>
+    </tr>
+    <tr>
+      <th>1611</th>
+      <td>British Home Championship</td>
+      <td>Geoff Hurst</td>
+      <td>4</td>
+      <td>33</td>
+      <td>12.121212</td>
+    </tr>
+    <tr>
+      <th>1623</th>
+      <td>CONMEBOL–UEFA Cup of Champions</td>
+      <td>Claudio Caniggia</td>
+      <td>1</td>
+      <td>7</td>
+      <td>14.285714</td>
+    </tr>
+    <tr>
+      <th>1675</th>
+      <td>Confederations Cup</td>
+      <td>Cuauhtémoc Blanco</td>
+      <td>9</td>
+      <td>423</td>
+      <td>2.127660</td>
+    </tr>
+    <tr>
+      <th>2687</th>
+      <td>Copa América</td>
+      <td>Norberto Doroteo Méndez</td>
+      <td>17</td>
+      <td>2671</td>
+      <td>0.636466</td>
+    </tr>
+    <tr>
+      <th>3932</th>
+      <td>FIFA World Cup</td>
+      <td>Miroslav Klose</td>
+      <td>16</td>
+      <td>2720</td>
+      <td>0.588235</td>
+    </tr>
+    <tr>
+      <th>5891</th>
+      <td>FIFA World Cup qualification</td>
+      <td>Carlos Ruiz</td>
+      <td>39</td>
+      <td>22738</td>
+      <td>0.171519</td>
+    </tr>
+    <tr>
+      <th>14396</th>
+      <td>Gold Cup</td>
+      <td>Landon Donovan</td>
+      <td>18</td>
+      <td>1097</td>
+      <td>1.640839</td>
+    </tr>
+    <tr>
+      <th>14627</th>
+      <td>NAFC Championship</td>
+      <td>Luis de la Fuente</td>
+      <td>3</td>
+      <td>10</td>
+      <td>30.000000</td>
+    </tr>
+    <tr>
+      <th>14673</th>
+      <td>Oceania Nations Cup</td>
+      <td>Damian Mori</td>
+      <td>14</td>
+      <td>534</td>
+      <td>2.621723</td>
+    </tr>
+    <tr>
+      <th>14927</th>
+      <td>UEFA Euro</td>
+      <td>Cristiano Ronaldo</td>
+      <td>14</td>
+      <td>829</td>
+      <td>1.688782</td>
+    </tr>
+    <tr>
+      <th>15885</th>
+      <td>UEFA Euro qualification</td>
+      <td>Cristiano Ronaldo</td>
+      <td>41</td>
+      <td>7958</td>
+      <td>0.515205</td>
+    </tr>
+    <tr>
+      <th>18748</th>
+      <td>UEFA Nations League</td>
+      <td>Aleksandar Mitrović</td>
+      <td>14</td>
+      <td>1184</td>
+      <td>1.182432</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+## Task 6
+
+We start by defining a function flag_data_quality_issues which initiates a column of False. We then supply a check to complete, if the check happens to spot an error, the corresponding False becomes True through the |= (bitwise) operation.
+
+
+```python
+def flag_data_quality_issues(df, checks):
+    flags = pd.Series(False, index=df.index)
+    for check in checks:
+        flags |= check(df)
+    return flags    
+```
+
+We now define our checks for data quality. For the shootouts dataset, we see lots of isues with the first_shooter column. For the results dataset, we call back to that issue involving Saare County and so look for games where the tournament is NaN as a flag. For goalscorers, we check for missing or impossible time data.
+
+
+```python
+def shootouts_checks(df):
+    return [
+        lambda df: df['first_shooter'].isna(),
+        lambda df: df['winner'].isna(),
+        lambda df: df['home_team'].isna(),
+        lambda df: df['away_team'].isna(),  
+    ]
+
+def results_checks(df):
+    return [
+        lambda df: df['home_score'].isna() | df['away_score'].isna(),
+        lambda df: df['tournament'].isna(),
+        lambda df: df['home_team'].isna(),
+        lambda df: df['away_team'].isna(), 
+        lambda df: df['tournament'].isna(),
+        lambda df: df['city'].isna(),
+        lambda df: df['country'].isna(), 
+        lambda df: df['neutral'].isna(),
+    ]
+
+def goalscorers_checks(df):
+    return [
+        lambda df: df['minute'].isna(), 
+        lambda df: df['home_team'].isna(),
+        lambda df: df['away_team'].isna(), 
+        lambda df: df['team'].isna(),
+        lambda df: df['scorer'].isna(), 
+        lambda df: df['own_goal'].isna(),
+        lambda df: df['penalty'].isna(), 
+    ]
+```
+
+Define a new column called data_quality_flag which applies the flagging function to the checking functions.
+
+
+```python
+shootouts_df['data_quality_flag'] = flag_data_quality_issues(shootouts_df, shootouts_checks(shootouts_df))
+results_df['data_quality_flag'] = flag_data_quality_issues(results_df, results_checks(results_df))
+goalscorers_df['data_quality_flag'] = flag_data_quality_issues(goalscorers_df, goalscorers_checks(goalscorers_df))
+
+shootouts_df.head()
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>date</th>
+      <th>home_team</th>
+      <th>away_team</th>
+      <th>winner</th>
+      <th>first_shooter</th>
+      <th>match_key</th>
+      <th>data_quality_flag</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>1967-08-22</td>
+      <td>India</td>
+      <td>Taiwan</td>
+      <td>Taiwan</td>
+      <td>NaN</td>
+      <td>1967-08-22_India_Taiwan</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>1971-11-14</td>
+      <td>South Korea</td>
+      <td>Vietnam Republic</td>
+      <td>South Korea</td>
+      <td>NaN</td>
+      <td>1971-11-14_South Korea_Vietnam Republic</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>1972-05-07</td>
+      <td>South Korea</td>
+      <td>Iraq</td>
+      <td>Iraq</td>
+      <td>NaN</td>
+      <td>1972-05-07_South Korea_Iraq</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>1972-05-17</td>
+      <td>Thailand</td>
+      <td>South Korea</td>
+      <td>South Korea</td>
+      <td>NaN</td>
+      <td>1972-05-17_Thailand_South Korea</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>1972-05-19</td>
+      <td>Thailand</td>
+      <td>Cambodia</td>
+      <td>Thailand</td>
+      <td>NaN</td>
+      <td>1972-05-19_Thailand_Cambodia</td>
+      <td>True</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+## Task 7
+
+Replace NaN values in first shooter column with a message saying 'Not Recorded'; could have replaced it with 0. Update the data quality flag column.
+
+
+```python
+shootouts_df['first_shooter'].fillna('Not Recorded', inplace=True)
+shootouts_df['data_quality_flag'] = flag_data_quality_issues(shootouts_df, shootouts_checks(shootouts_df))
+shootouts_df[shootouts_df['data_quality_flag'] == True]
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>date</th>
+      <th>home_team</th>
+      <th>away_team</th>
+      <th>winner</th>
+      <th>first_shooter</th>
+      <th>match_key</th>
+      <th>data_quality_flag</th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+
+
+
+We check to see if there are any data quality issues with the results dataframe.
+
+
+```python
+results_df['data_quality_flag'] = flag_data_quality_issues(results_df, results_checks(results_df))
+results_df[results_df['data_quality_flag'] == True]
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>date</th>
+      <th>home_team</th>
+      <th>away_team</th>
+      <th>home_score</th>
+      <th>away_score</th>
+      <th>tournament</th>
+      <th>city</th>
+      <th>country</th>
+      <th>neutral</th>
+      <th>match_key</th>
+      <th>data_quality_flag</th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+
+
+
+We look for rows with data quality issues and replace NaN values with 'Not Recorded'.
+
+
+```python
+goalscorers_df['minute'].fillna('Not Recorded', inplace=True)
+goalscorers_df['scorer'].fillna('Not Recorded', inplace=True)
+goalscorers_df['own_goal'].fillna('Not Recorded', inplace=True)
+goalscorers_df['penalty'].fillna('Not Recorded', inplace=True)
+goalscorers_df['data_quality_flag'] = flag_data_quality_issues(goalscorers_df, goalscorers_checks(goalscorers_df))
+goalscorers_df[goalscorers_df['data_quality_flag'] == True]
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>date</th>
+      <th>home_team</th>
+      <th>away_team</th>
+      <th>team</th>
+      <th>scorer</th>
+      <th>minute</th>
+      <th>own_goal</th>
+      <th>penalty</th>
+      <th>match_key</th>
+      <th>data_quality_flag</th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div>
+
+
 
